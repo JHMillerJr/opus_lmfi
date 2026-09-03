@@ -1,6 +1,6 @@
-#> name: gentemp.py
+#> name: genPriorPop_1.py
 #> author: John Miller Jr
-#> descrp: template file to generate galaxy/quad populations from generate.py
+#> descrp: generates a population of galaxies/quads by drawing from the priors in opus
 
 """ #> IMPORTS =======================
 ================================== """
