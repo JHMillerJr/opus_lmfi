@@ -28,8 +28,8 @@ def function():
     from modules.units import u; u=u()
     
     #> declarations
-    numGals       = 100                        # total # of galaxies to generate
-    numSource_gal = 500                        # total # of sources per galaxy
+    numGals       = 10                        # total # of galaxies to generate
+    numSource_gal = 50                        # total # of sources per galaxy
     
     #> random seed
     seed = 42                                  # numpy random seed
@@ -43,7 +43,7 @@ def function():
     #> output kwargs
     parent_dir = '../opus_lmfi/'               # parent dir
     folder   = '+unsorted'                     # dir in dataDir to save data
-    suffix   = '_pop12'                          # suffix to add to file names
+    suffix   = '_test'                          # suffix to add to file names
     verbose  = False                           # if wanting extra print info
     timeFlag = False                           # if wanting time info
     saveFlag = generate.getSaveDict(True)      # what to save (images=im_obs=sources=bprofiles=True, im_mags=lens=False)
