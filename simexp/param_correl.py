@@ -553,12 +553,12 @@ def correlations(folder):
     for file in files:
         
         #> loading data
-        print(file)
         gal_data = np.load(file, allow_pickle=True).item()
         
         #> separating info
         positions = np.load(gal_data['positions'], allow_pickle=True)
-        observables = np.load(gal_data['observables'], allow_pickle=True)
+        # observables = np.load(gal_data['observables'], allow_pickle=True)
+        observables = np.load(gal_data['observables'].replace('_observables', '_new_observables'), allow_pickle=True)[:,:-1]
         headers = gal_data['headers']
         muv = gal_data['muv']
         cov = gal_data['cov']
@@ -699,7 +699,8 @@ def plotObservables(folder):
         
         #> separating info
         positions = np.load(gal_data['positions'], allow_pickle=True)
-        observables = np.load(gal_data['observables'], allow_pickle=True)
+        # observables = np.load(gal_data['observables'], allow_pickle=True)
+        observables = np.load(gal_data['observables'].replace('_observables', '_new_observables'), allow_pickle=True)[:,:-1]
         headers = gal_data['headers']
         muv = gal_data['muv']
         cov = gal_data['cov']
@@ -721,6 +722,256 @@ def plotObservables(folder):
     print(f'./figures/{name}_histograms.png')
     plt.savefig(f'./figures/{name}_histograms.png', bbox_inches='tight', dpi=100)
     plt.show(); plt.close()
+    
+    return
+
+
+#> plotting 
+def fsq2D(folder):
+    
+    import re
+    import matplotlib.pyplot as plt
+    from natsort import natsorted
+    
+    #> getting .npy files from requested folder
+    files = glob.glob(folder+'/*_gal.npy')
+    files = sorted(files, key=lambda x: int(re.findall("(?<=)\d+", x)[0]))
+    files = natsorted(files)
+    numBins = int( len(files) / 2 )
+    name = folder.split('/')[-1]
+    
+    #> initializing plot
+    fig, axes = plt.subplots(1,2,figsize=(2*6, 6))
+    alpha = 0.6
+    lw=2
+    
+    plt.subplots_adjust(left=None, bottom=None, right=None, top=None, wspace=0.05, hspace=None)
+    
+    plt.suptitle(f'{name}', y=0.92, fontweight='bold', fontsize=20)
+    
+    #> iterating throuhg each file
+    moments, mus, covs = [], [], []
+    for j, file in enumerate(files):
+        
+        #> loading data
+        print(file)
+        gal_data = np.load(file, allow_pickle=True).item()
+        
+        #> separating info
+        # observables = np.load(gal_data['observables'], allow_pickle=True)
+        observables = np.load(gal_data['observables'].replace('_observables', '_new_observables'), allow_pickle=True)[:,:-1]
+        headers = gal_data['headers']
+        muv = gal_data['muv']
+        cov = gal_data['cov']
+        
+        #> removing outliers
+        df_obs = pd.DataFrame(observables, columns=headers)
+        observables = df_obs[ df_obs['t12'] < 200 ].to_numpy()
+        
+        for i, ax in zip(range(len(headers)), axes.flat):
+            
+            #> plotting dt23 hist
+            if i == 0: 
+                n, bins, patches = ax.hist(observables[:,-1], histtype='step', alpha=alpha, lw=lw, density=True, label=f'{muv[0]:.3f}')  
+                ax.set_yticklabels([])
+            
+            if i == 1:
+                ax.scatter(observables[:,1],observables[:,-1], alpha=0.05)
+                
+            if j == 0:
+                if i == 0:
+                    ax.set_xlabel(headers[-1], fontweight='bold', fontsize=15, labelpad=15)
+                if i == 1:
+                    ax.set_xlabel(headers[1], fontweight='bold', fontsize=15, labelpad=15)
+                    ax.set_ylabel(headers[-1], fontweight='bold', fontsize=15, labelpad=15)
+                ax.grid(ls=':', alpha=0.5)
+                
+    axes.flat[0].legend()
+    
+    print(f'./figures/{name}_histograms.png')
+    plt.savefig(f'./figures/{name}_histograms.png', bbox_inches='tight', dpi=100)
+    plt.show(); plt.close()
+    
+    return
+
+
+""" #> RECALCULATES ==================
+================================== """
+
+#> recalculates observables
+def recalObs(folder):
+    
+    #> imports
+    import re
+    sys.path.insert(1, 'C:/Users/mille/Desktop/Research/+projects/opus/modules/')
+    import geometry
+    import lensing
+    from natsort import natsorted
+    
+    #> getting positions.npy files from requested folder
+    files = glob.glob(folder+'/*_positions.npy')
+    files = sorted(files, key=lambda x: int(re.findall("(?<=)\d+", x)[0]))
+    files = np.array([x.replace('\\', '/') for x in files])
+    files = natsorted(files)
+    
+    #> recalculates the observables for set of image positions
+    observables = ['t12', 't23', 't34', 'd2/d1', 'd3/d1' ,'d4/d1', 'dt23', 'd01']
+    
+    #> iterating thru files
+    for file in files:
+        
+        #> loading images
+        images = np.load(file, allow_pickle=True)
+        
+        #> new outfile name
+        outFile = file[:-len('positions.npy')] + 'new_observables.npy'
+        print(outFile)
+        
+        #> getting observables
+        im_obs = []
+        for ims in images:
+            
+            ims = np.array(ims, dtype=float)
+            
+            #> redoing order
+            ordered_ims = lensing.arrivalOrder(ims, x0=0., y0=0.)
+            
+            #> getting observables
+            im_obs.append(geometry.lensObs((0, 0), ordered_ims, observables))
+            
+        #> saving
+        np.save(outFile, im_obs)
+        
+    return
+
+#> compares differences between obsrevable foldesr
+def compareObs(folder):
+    
+    #> imports
+    sys.path.insert(1, '../opus_lmfi/')
+    import re
+    import geometry
+    import lensing
+    from natsort import natsorted
+    
+    #> getting positions.npy files from requested folder
+    files = glob.glob(folder+'/*_new_observables.npy')
+    files = sorted(files, key=lambda x: int(re.findall("(?<=)\d+", x)[0]))
+    files = np.array([x.replace('\\', '/') for x in files])
+    files = natsorted(files)
+    
+    #> getting the old files
+    old_files = []
+    for file in files:
+        old_files.append(file.replace('_new', ''))
+    old_files = np.array(old_files)
+    
+    #> loading and comparing the observables
+    for new_file, file in zip(files, old_files):
+        
+        #> loading data
+        new_obs = np.load(new_file, allow_pickle=True)[:,:-1]
+        old_obs = np.load(file, allow_pickle=False)
+        
+        #> not equal
+        mask = abs(new_obs - old_obs) > 0.001
+        num_diff = sum(mask)
+        print(num_diff)
+    
+    return
+
+
+""" #> LOOKING AT OUTLIERS ===========
+================================== """
+
+#> looking at dt23 outliers
+def dt23Outliers(folder):
+    
+    #> imports 
+    import re
+    import plot
+    import matplotlib.pyplot as plt
+    from natsort import natsorted
+    from scipy import stats
+    
+    #> getting positions.npy files from requested folder
+    files = glob.glob(folder+'/*_new_observables.npy')
+    files = sorted(files, key=lambda x: int(re.findall("(?<=)\d+", x)[0]))
+    files = np.array([x.replace('\\', '/') for x in files])
+    files = natsorted(files)
+    
+    observables = ['t12', 't23', 't34', 'd2/d1', 'd3/d1' ,'d4/d1', 'dt23', 'd01']
+    
+    #> iterating thru files
+    for file in files:
+        
+        #> loading obs
+        im_obs = np.load(file, allow_pickle=True)
+        df = pd.DataFrame(im_obs, columns=observables)
+        
+        #> image positions
+        positions = np.load(file.replace('_new_observables', '_positions'), allow_pickle=True)
+        
+        #> getting z score
+        df['z'] = np.abs(stats.zscore(df['dt23']))
+        
+        #> getting outliers
+        outliers = df[ df['z'] > 10.0 ]['dt23']
+        
+        #> if there are outliers
+        if len(outliers) != 0:
+            
+            #> print info
+            print(file)
+            print(outliers)
+            
+            #> get positions
+            indx = outliers.index.to_numpy()
+            outlier_pos = positions[indx]
+            
+            #> plot quads
+            for ims in outlier_pos:
+                fig, ax = plt.subplots(1,1,figsize=(6,6))
+                ax.grid(ls=':', alpha=0.5)
+                for i, im in enumerate(ims):
+                    ax.scatter(im[0], im[1], label=f'{i+1}')
+                ax.scatter(0,0,marker='+', s=100, c='k')
+                plot.toBox(ax)
+                plot.ticks(ax)
+                plt.legend()
+                plt.show(); plt.close()
+    
+    return
+
+
+""" #> W-COMPARISONS =================
+================================== """
+
+#> compares the param_correl gals and quads
+def w_comp(folder):
+    
+    #> imports
+    import re
+    from natsort import natsorted
+    import modules.metric as metric
+    
+    #> getting new_obseravables.npy files from requested folder
+    files = glob.glob(folder+'/*_new_observables.npy')
+    files = sorted(files, key=lambda x: int(re.findall("(?<=)\d+", x)[0]))
+    files = np.array([x.replace('\\', '/') for x in files])
+    obs_files = natsorted(files)
+    
+    #> getting gal files
+    gal_files = np.array([x.replace('_new_observables', '_gal') for x in obs_files])
+    
+    #> define a 'observed' file
+    
+    for obs_file, gal_file in zip(obs_files, gal_files):
+        
+        gal = np.load(gal_file, allow_pickle=True).item()
+        # print(gal.keys())
+        # print(gal['paramRanges']['nfw'][0]['axisrat'])
+    
     
     return
 
@@ -750,7 +1001,7 @@ if __name__ == '__main__':
     bins = args.bins
     numGals = args.numGals
     fit = args.fit # whether to have spread in params or not
-    print(fit)
+     #print(fit)
     functions = {'nfw_axisrat': nfw_axisrat, 'hern_axisrat': hern_axisrat, 
                  'both_axisrat': both_axisrat, 'nfw_theta': nfw_theta, 
                  'm1_norm': m1_norm, 'm1_theta': m1_theta, 
@@ -776,8 +1027,13 @@ if __name__ == '__main__':
                 folder = dir_path + fn.__name__ + '_fit'
             else:
                 folder = dir_path + fn.__name__
-            correlations(folder)
-            plotObservables(folder)
+            #correlations(folder)
+            #plotObservables(folder)
+            w_comp(folder)
+            # recalObs(folder)
+            # compareObs(folder)
+            # fsq2D(folder)
+            # dt23Outliers(folder)
     
     # folder = dir_path + 'nfw_axisrat'
     # correlations(folder)
